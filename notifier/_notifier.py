@@ -235,6 +235,9 @@ class Notifier(object):
         :type args: list
         :param kwargs: key-value pair arguments
         :type kwargs: dictionary
+
+        :returns: the listener that was registered
+        :rtype: :py:class:`~.Listener`
         """
         if not six.callable(callback):
             raise ValueError("Event callback must be callable")
@@ -253,9 +256,11 @@ class Notifier(object):
                 if k in kwargs:
                     raise KeyError("Reserved key '%s' not allowed in "
                                    "kwargs" % k)
+        listener = Listener(callback, args=args, kwargs=kwargs,
+                            details_filter=details_filter)
         listeners = self._topics.setdefault(event_type, [])
-        listeners.append(Listener(callback, args=args, kwargs=kwargs,
-                                  details_filter=details_filter))
+        listeners.append(listener)
+        return listener
 
     def deregister(self, event_type, callback, details_filter=None):
         """Remove a single listener bound to event ``event_type``.
