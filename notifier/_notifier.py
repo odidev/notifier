@@ -19,6 +19,7 @@ import copy
 import logging
 import threading
 
+from frozendict import frozendict
 from oslo_utils import reflection
 import six
 
@@ -51,9 +52,9 @@ class Listener(object):
             else:
                 self._args = args
         if not kwargs:
-            self._kwargs = {}
+            self._kwargs = frozendict()
         else:
-            self._kwargs = kwargs.copy()
+            self._kwargs = frozendict(kwargs)
 
     @property
     def callback(self):
@@ -67,8 +68,8 @@ class Listener(object):
 
     @property
     def kwargs(self):
-        """Dictionary of keyword arguments to use in future calls."""
-        return self._kwargs.copy()
+        """Frozen dictionary of keyword arguments to use in future calls."""
+        return self._kwargs
 
     @property
     def args(self):
@@ -85,7 +86,7 @@ class Listener(object):
         if self._details_filter is not None:
             if not self._details_filter(details):
                 return
-        kwargs = self._kwargs.copy()
+        kwargs = dict(self._kwargs)
         kwargs['details'] = details
         self._callback(event_type, *self._args, **kwargs)
 
