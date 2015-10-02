@@ -19,4 +19,3 @@ from testtools import testcase
 
 class TestCase(testcase.TestCase):
     """Test case base class for all notifier unit tests."""
-
