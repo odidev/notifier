@@ -318,7 +318,11 @@ class Notifier(object):
                 pass
 
     def can_be_registered(self, event_type):
-        """Checks if the event can be registered/subscribed to."""
+        """Checks if the event can be registered/subscribed to.
+
+        :returns: whether the event_type can be registered/subscribed to.
+        :rtype: boolean
+        """
         return True
 
     def can_trigger_notification(self, event_type):
