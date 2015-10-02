@@ -14,11 +14,5 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-# Promote exposed to this module namespace (for public access).
-from notifier._notifier import Listener  # noqa
-from notifier._notifier import Notifier  # noqa
-from notifier._notifier import RestrictedNotifier  # noqa
-
-from notifier._notifier import register_deregister  # noqa
-
-from notifier._constants import ANY  # noqa
+#: Kleene star constant that is used to recieve all notifications
+ANY = '*'

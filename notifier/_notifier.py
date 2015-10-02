@@ -23,6 +23,8 @@ from frozendict import frozendict
 from oslo_utils import reflection
 import six
 
+from notifier import _constants
+
 LOG = logging.getLogger(__name__)
 
 
@@ -140,7 +142,7 @@ class Notifier(object):
     RESERVED_KEYS = ('details',)
 
     #: Kleene star constant that is used to recieve all notifications
-    ANY = '*'
+    ANY = _constants.ANY
 
     #: Events which can *not* be used to trigger notifications
     _DISALLOWED_NOTIFICATION_EVENTS = set([ANY])
