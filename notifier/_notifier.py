@@ -18,6 +18,7 @@ import collections
 import contextlib
 import copy
 import logging
+import threading
 
 from oslo_utils import reflection
 import six
@@ -132,13 +133,6 @@ class Notifier(object):
     associated subscribers without having either entity care about how this
     notification occurs.
 
-    **Not** thread-safe when a single notifier is mutated at the same
-    time by multiple threads. For example having multiple threads call
-    into :py:meth:`.register` or :py:meth:`.reset` at the same time could
-    potentially end badly. It is thread-safe when
-    only :py:meth:`.notify` calls or other read-only actions (like calling
-    into :py:meth:`.is_registered`) are occuring at the same time.
-
     .. _pub/sub: http://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
     """
 
@@ -152,7 +146,8 @@ class Notifier(object):
     _DISALLOWED_NOTIFICATION_EVENTS = set([ANY])
 
     def __init__(self):
-        self._topics = collections.defaultdict(list)
+        self._topics = {}
+        self._lock = threading.Lock()
 
     def __len__(self):
         """Returns how many callbacks are registered.
@@ -161,17 +156,24 @@ class Notifier(object):
         :rtype: number
         """
         count = 0
-        for (_event_type, listeners) in six.iteritems(self._topics):
-            count += len(listeners)
+        topics = set(six.iterkeys(self._topics))
+        while topics:
+            event_type = topics.pop()
+            try:
+                listeners = self._topics[event_type]
+                count += len(listeners)
+            except KeyError:
+                pass
         return count
 
     def is_registered(self, event_type, callback, details_filter=None):
         """Check if a callback is registered.
 
-        :returns: checks if the callback is registered
+        :returns: if the callback is registered
         :rtype: boolean
         """
-        for listener in self._topics.get(event_type, []):
+        listeners = self._topics.get(event_type, [])
+        for listener in listeners:
             if listener.is_equivalent(callback, details_filter=details_filter):
                 return True
         return False
@@ -181,7 +183,7 @@ class Notifier(object):
         self._topics.clear()
 
     def notify(self, event_type, details):
-        """Notify about event occurrence.
+        """Notify about an event occurrence.
 
         All callbacks registered to receive notifications about given
         event type will be called. If the provided event type can not be
@@ -249,36 +251,50 @@ class Notifier(object):
                 if k in kwargs:
                     raise KeyError("Reserved key '%s' not allowed in "
                                    "kwargs" % k)
-        self._topics[event_type].append(
-            Listener(callback,
-                     args=args, kwargs=kwargs,
-                     details_filter=details_filter))
+        listeners = self._topics.setdefault(event_type, [])
+        listeners.append(Listener(callback, args=args, kwargs=kwargs,
+                                  details_filter=details_filter))
 
     def deregister(self, event_type, callback, details_filter=None):
         """Remove a single listener bound to event ``event_type``.
 
         :param event_type: deregister listener bound to event_type
+
+        :returns: if the callback was deregistered
+        :rtype: boolean
         """
-        if event_type not in self._topics:
+        with self._lock:
+            listeners = self._topics.get(event_type, [])
+            for i, listener in enumerate(listeners):
+                if listener.is_equivalent(callback,
+                                          details_filter=details_filter):
+                    listeners.pop(i)
+                    return True
             return False
-        for i, listener in enumerate(self._topics.get(event_type, [])):
-            if listener.is_equivalent(callback, details_filter=details_filter):
-                self._topics[event_type].pop(i)
-                return True
-        return False
 
     def deregister_event(self, event_type):
         """Remove a group of listeners bound to event ``event_type``.
 
         :param event_type: deregister listeners bound to event_type
+
+        :returns: how many callbacks were deregistered
+        :rtype: int
         """
         return len(self._topics.pop(event_type, []))
 
     def copy(self):
+        """Clones this notifier (and its bound listeners)."""
         c = copy.copy(self)
-        c._topics = collections.defaultdict(list)
-        for (event_type, listeners) in six.iteritems(self._topics):
-            c._topics[event_type] = listeners[:]
+        c._topics = {}
+        c._lock = threading.Lock()
+        topics = set(six.iterkeys(self._topics))
+        while topics:
+            event_type = topics.pop()
+            try:
+                listeners = self._topics[event_type]
+                c._topics[event_type] = list(listeners)
+            except KeyError:
+                pass
         return c
 
     def listeners_iter(self):
@@ -289,9 +305,13 @@ class Notifier(object):
         itself wraps a provided callback (and its details filter
         callback, if any).
         """
-        for event_type, listeners in six.iteritems(self._topics):
-            if listeners:
-                yield (event_type, listeners)
+        topics = set(six.iterkeys(self._topics))
+        while topics:
+            event_type = topics.pop()
+            try:
+                yield self._topics[event_type]
+            except KeyError:
+                pass
 
     def can_be_registered(self, event_type):
         """Checks if the event can be registered/subscribed to."""
