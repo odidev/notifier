@@ -247,20 +247,21 @@ class Notifier(object):
         if not self.can_be_registered(event_type):
             raise ValueError("Disallowed event type '%s' can not have a"
                              " callback registered" % event_type)
-        if self.is_registered(event_type, callback,
-                              details_filter=details_filter):
-            raise ValueError("Event callback already registered with"
-                             " equivalent details filter")
         if kwargs:
             for k in self.RESERVED_KEYS:
                 if k in kwargs:
                     raise KeyError("Reserved key '%s' not allowed in "
                                    "kwargs" % k)
-        listener = Listener(callback, args=args, kwargs=kwargs,
-                            details_filter=details_filter)
-        listeners = self._topics.setdefault(event_type, [])
-        listeners.append(listener)
-        return listener
+        with self._lock:
+            if self.is_registered(event_type, callback,
+                                  details_filter=details_filter):
+                raise ValueError("Event callback already registered with"
+                                 " equivalent details filter")
+            listener = Listener(callback, args=args, kwargs=kwargs,
+                                details_filter=details_filter)
+            listeners = self._topics.setdefault(event_type, [])
+            listeners.append(listener)
+            return listener
 
     def deregister(self, event_type, callback, details_filter=None):
         """Remove a single listener bound to event ``event_type``.
