@@ -147,9 +147,12 @@ class Notifier(object):
     #: Events which can *not* be used to trigger notifications
     _DISALLOWED_NOTIFICATION_EVENTS = set([ANY])
 
-    def __init__(self):
+    def __init__(self, logger=None):
         self._topics = {}
         self._lock = threading.Lock()
+        if logger is None:
+            logger = LOG
+        self._logger = logger
 
     def __len__(self):
         """Returns how many callbacks are registered.
@@ -200,8 +203,8 @@ class Notifier(object):
         :type details: dictionary
         """
         if not self.can_trigger_notification(event_type):
-            LOG.debug("Event type '%s' is not allowed to trigger"
-                      " notifications", event_type)
+            self._logger.debug("Event type '%s' is not allowed to trigger"
+                               " notifications", event_type)
             return
         listeners = list(self._topics.get(self.ANY, []))
         listeners.extend(self._topics.get(event_type, []))
@@ -213,9 +216,10 @@ class Notifier(object):
             try:
                 listener(event_type, details.copy())
             except Exception:
-                LOG.warn("Failure calling listener %s to notify about event"
-                         " %s, details: %s", listener, event_type,
-                         details, exc_info=True)
+                self._logger.warn(
+                    "Failure calling listener %s to notify about event"
+                    " %s, details: %s", listener, event_type, details,
+                    exc_info=True)
 
     def register(self, event_type, callback,
                  args=None, kwargs=None, details_filter=None):
@@ -352,8 +356,8 @@ class RestrictedNotifier(Notifier):
     when constructing the notifier.
     """
 
-    def __init__(self, watchable_events, allow_any=True):
-        super(RestrictedNotifier, self).__init__()
+    def __init__(self, watchable_events, allow_any=True, logger=None):
+        super(RestrictedNotifier, self).__init__(logger=logger)
         self._watchable_events = frozenset(watchable_events)
         self._allow_any = allow_any
 
