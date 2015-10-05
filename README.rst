@@ -2,8 +2,8 @@
 Notifier
 ========
 
-In memory pub/sub [5]_
+In memory pub/sub [1]_
 
 * Free software: Apache license
 
-.. [5] See: `publish–subscribe pattern <https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern>`_
+.. [1] See: `publish–subscribe pattern <https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern>`_
