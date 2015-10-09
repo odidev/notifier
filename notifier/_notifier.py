@@ -28,6 +28,7 @@ except AttributeError:
     weak_method = weakrefmethod.WeakMethod
 
 from frozendict import frozendict
+import futurist
 from oslo_utils import reflection
 from oslo_utils import uuidutils
 import six
@@ -210,6 +211,7 @@ class Notifier(object):
         if logger is None:
             logger = LOG
         self._logger = logger
+        self._executor = futurist.SynchronousExecutor()
 
     def __len__(self):
         """Returns how many callbacks are registered.
@@ -244,6 +246,16 @@ class Notifier(object):
         """Forget all previously registered callbacks."""
         self._topics.clear()
 
+    def _do_dispatch(self, listeners, event_type, details):
+        for listener in listeners:
+            try:
+                listener(event_type, details.copy())
+            except Exception:
+                self._logger.warn(
+                    "Failure calling listener %s to notify about event"
+                    " %s, details: %s", listener, event_type, details,
+                    exc_info=True)
+
     def notify(self, event_type, details):
         """Notify about an event occurrence.
 
@@ -269,14 +281,8 @@ class Notifier(object):
             return
         if not details:
             details = {}
-        for listener in listeners:
-            try:
-                listener(event_type, details.copy())
-            except Exception:
-                self._logger.warn(
-                    "Failure calling listener %s to notify about event"
-                    " %s, details: %s", listener, event_type, details,
-                    exc_info=True)
+        self._executor.submit(self._do_dispatch, listeners,
+                              event_type, details)
 
     def register(self, event_type, callback,
                  args=None, kwargs=None, details_filter=None,
