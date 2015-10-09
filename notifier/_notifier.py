@@ -123,14 +123,15 @@ class Listener(object):
         a falsey value when called with the provided ``details``, then the
         target callback will **not** be called.
         """
+        cb = self.callback
+        if cb is None:
+            return
         if self._details_filter is not None:
             if not self._details_filter(details):
                 return
         kwargs = dict(self._kwargs)
         kwargs['details'] = details
-        cb = self.callback
-        if cb is not None:
-            cb(event_type, *self._args, **kwargs)
+        cb(event_type, *self._args, **kwargs)
 
     def __repr__(self):
         cb = self.callback
