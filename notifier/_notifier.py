@@ -173,9 +173,9 @@ class Listener(object):
             return self._details_filter is None
 
     def __eq__(self, other):
-        """Checks if the provided listener has is equivalent.
+        """Checks if the provided listener is equivalent.
 
-        Does not check that the provided listener has the same uuid or
+        Does **not** check that the provided listener has the same uuid or
         arguments or keyword arguments (only checks that the provided
         listener has the same callback and details filter callback).
         """
@@ -233,6 +233,11 @@ class Notifier(object):
 
     def is_registered(self, event_type, callback, details_filter=None):
         """Check if a callback is registered.
+
+        :param event_type: event type callback was registered to
+        :param callback: callback that was used during registration
+        :param details_filter: details filter that was used during
+                               registration
 
         :returns: if the callback is registered
         :rtype: boolean
@@ -298,7 +303,7 @@ class Notifier(object):
         the target callback will *only* be triggered if the details filter
         callback returns a truthy value).
 
-        :param event_type: event type input
+        :param event_type: event type to get triggered on
         :param callback: function callback to be registered.
         :param args: non-keyworded arguments
         :type args: list
