@@ -16,8 +16,16 @@
 
 import contextlib
 import copy
+import inspect
 import logging
 import threading
+import weakref
+
+try:
+    weak_method = weakref.WeakMethod
+except AttributeError:
+    import weakrefmethod
+    weak_method = weakrefmethod.WeakMethod
 
 from frozendict import frozendict
 from oslo_utils import reflection
@@ -28,10 +36,21 @@ from notifier import _constants
 LOG = logging.getLogger(__name__)
 
 
+def _make_ref(callback, weak=False):
+    if not weak:
+        return callback
+    if inspect.ismethod(callback):
+        return weak_method(callback)
+    else:
+        return weakref.ref(callback)
+
+
 class Listener(object):
     """Immutable helper that represents a notification listener/target."""
 
-    def __init__(self, callback, args=None, kwargs=None, details_filter=None):
+    def __init__(self, callback,
+                 args=None, kwargs=None, details_filter=None,
+                 weak=False):
         """Initialize members
 
         :param callback: callback function
@@ -43,9 +62,13 @@ class Listener(object):
         :type args: list/iterable/tuple
         :param kwargs: key-value pair arguments
         :type kwargs: dictionary
+        :param weak: whether the callback provided is referenced via a
+                     weak reference or a strong reference
+        :type weak: bool
         """
         self._callback = callback
         self._details_filter = details_filter
+        self._weak = weak
         if not args:
             self._args = ()
         else:
@@ -60,7 +83,14 @@ class Listener(object):
 
     @property
     def callback(self):
-        """Callback (can not be none) to call with event + details."""
+        """Callback (may be none) to call with event + details.
+
+        If the callback is maintained via a weak reference, and that
+        weak reference has been collected, this will be none instead of
+        an actual callback.
+        """
+        if self._weak:
+            return self._callback()
         return self._callback
 
     @property
@@ -90,25 +120,39 @@ class Listener(object):
                 return
         kwargs = dict(self._kwargs)
         kwargs['details'] = details
-        self._callback(event_type, *self._args, **kwargs)
+        cb = self.callback
+        if cb is not None:
+            cb(event_type, *self._args, **kwargs)
 
     def __repr__(self):
-        repr_msg = "%s object at 0x%x calling into '%r'" % (
-            reflection.get_class_name(self, fully_qualified=False),
-            id(self), self._callback)
-        if self._details_filter is not None:
-            repr_msg += " using details filter '%r'" % self._details_filter
+        cb = self.callback
+        if cb is None:
+            repr_msg = "%s object at 0x%x; dead" % (
+                reflection.get_class_name(self, fully_qualified=False),
+                id(self))
+        else:
+            repr_msg = "%s object at 0x%x calling into '%r'" % (
+                reflection.get_class_name(self, fully_qualified=False),
+                id(self), cb)
+            if self._details_filter is not None:
+                repr_msg += " using details filter '%r'" % self._details_filter
         return "<%s>" % repr_msg
 
     def is_equivalent(self, callback, details_filter=None):
-        """Check if the callback is same
+        """Check if the callback provided is the same as the internal one.
 
         :param callback: callback used for comparison
         :param details_filter: callback used for comparison
         :returns: false if not the same callback, otherwise true
         :rtype: boolean
         """
-        if not reflection.is_same_callback(self._callback, callback):
+        cb = self.callback
+        if cb is None and callback is not None:
+            return False
+        if cb is not None and callback is None:
+            return False
+        if cb is not None and callback is not None \
+           and not reflection.is_same_callback(cb, callback):
             return False
         if details_filter is not None:
             if self._details_filter is None:
@@ -121,7 +165,7 @@ class Listener(object):
 
     def __eq__(self, other):
         if isinstance(other, Listener):
-            return self.is_equivalent(other._callback,
+            return self.is_equivalent(other.callback,
                                       details_filter=other._details_filter)
         else:
             return NotImplemented
@@ -222,7 +266,8 @@ class Notifier(object):
                     exc_info=True)
 
     def register(self, event_type, callback,
-                 args=None, kwargs=None, details_filter=None):
+                 args=None, kwargs=None, details_filter=None,
+                 weak=False):
         """Register a callback to be called when event of a given type occurs.
 
         Callback will be called with provided ``args`` and ``kwargs`` and
@@ -239,6 +284,10 @@ class Notifier(object):
         :type args: list
         :param kwargs: key-value pair arguments
         :type kwargs: dictionary
+        :param weak: if the callback retained should be referenced via
+                     a weak reference or a strong reference (defaults to
+                     holding a strong reference)
+        :type weak: bool
 
         :returns: the listener that was registered
         :rtype: :py:class:`~.Listener`
@@ -261,8 +310,10 @@ class Notifier(object):
                                   details_filter=details_filter):
                 raise ValueError("Event callback already registered with"
                                  " equivalent details filter")
-            listener = Listener(callback, args=args, kwargs=kwargs,
-                                details_filter=details_filter)
+            listener = Listener(_make_ref(callback, weak=weak),
+                                args=args, kwargs=kwargs,
+                                details_filter=details_filter,
+                                weak=weak)
             listeners = self._topics.setdefault(event_type, [])
             listeners.append(listener)
             return listener
@@ -384,7 +435,8 @@ class RestrictedNotifier(Notifier):
 
 @contextlib.contextmanager
 def register_deregister(notifier, event_type, callback=None,
-                        args=None, kwargs=None, details_filter=None):
+                        args=None, kwargs=None, details_filter=None,
+                        weak=False):
     """Context manager that registers a callback, then deregisters on exit.
 
     NOTE(harlowja): if the callback is none, then this registers nothing, which
@@ -396,7 +448,8 @@ def register_deregister(notifier, event_type, callback=None,
     else:
         notifier.register(event_type, callback,
                           args=args, kwargs=kwargs,
-                          details_filter=details_filter)
+                          details_filter=details_filter,
+                          weak=weak)
         try:
             yield
         finally:
