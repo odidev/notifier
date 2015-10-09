@@ -29,6 +29,7 @@ except AttributeError:
 
 from frozendict import frozendict
 from oslo_utils import reflection
+from oslo_utils import uuidutils
 import six
 
 from notifier import _constants
@@ -66,6 +67,7 @@ class Listener(object):
                      weak reference or a strong reference
         :type weak: bool
         """
+        self._uuid = uuidutils.generate_uuid()
         self._callback = callback
         self._details_filter = details_filter
         self._weak = weak
@@ -97,6 +99,11 @@ class Listener(object):
     def details_filter(self):
         """Callback (may be none) to call to discard events + details."""
         return self._details_filter
+
+    @property
+    def uuid(self):
+        """Unique identifier that uniquely identifies this listener."""
+        return self._uuid
 
     @property
     def kwargs(self):
@@ -164,6 +171,12 @@ class Listener(object):
             return self._details_filter is None
 
     def __eq__(self, other):
+        """Checks if the provided listener has is equivalent.
+
+        Does not check that the provided listener has the same uuid or
+        arguments or keyword arguments (only checks that the provided
+        listener has the same callback and details filter callback).
+        """
         if isinstance(other, Listener):
             return self.is_equivalent(other.callback,
                                       details_filter=other._details_filter)
@@ -322,8 +335,11 @@ class Notifier(object):
         """Remove a single listener bound to event ``event_type``.
 
         :param event_type: deregister listener bound to event_type
+        :param callback: callback that was used during registration
+        :param details_filter: details filter that was used during
+                               registration
 
-        :returns: if the callback was deregistered
+        :returns: if a listener was deregistered
         :rtype: boolean
         """
         with self._lock:
@@ -331,6 +347,23 @@ class Notifier(object):
             for i, listener in enumerate(listeners):
                 if listener.is_equivalent(callback,
                                           details_filter=details_filter):
+                    listeners.pop(i)
+                    return True
+            return False
+
+    def deregister_by_uuid(self, event_type, uuid):
+        """Remove a single listener bound to event ``event_type``.
+
+        :param event_type: deregister listener bound to event_type
+        :param uuid: uuid of listener to remove
+
+        :returns: if the listener was deregistered
+        :rtype: boolean
+        """
+        with self._lock:
+            listeners = self._topics.get(event_type, [])
+            for i, listener in enumerate(listeners):
+                if listener.uuid == uuid:
                     listeners.pop(i)
                     return True
             return False
