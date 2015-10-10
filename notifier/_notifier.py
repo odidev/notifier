@@ -298,11 +298,8 @@ class Notifier(object):
                   depending on internal executor used.
         """
         if not self.can_trigger_notification(event_type):
-            self._logger.debug("Event type '%s' is not allowed to trigger"
-                               " notifications", event_type)
-            fut = futurist.Future()
-            fut.set_result(0)
-            return fut
+            raise ValueError("Event type '%s' is not allowed to trigger"
+                             " notifications" % event_type)
         listeners = list(self._topics.get(self.ANY, []))
         listeners.extend(self._topics.get(event_type, []))
         if not details:

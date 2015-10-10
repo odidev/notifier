@@ -45,7 +45,7 @@ class NotifierTest(test.TestCase):
 
         notifier = nt.Notifier()
         notifier.register(nt.Notifier.ANY, call_me)
-        notifier.notify(nt.Notifier.ANY, {})
+        self.assertRaises(ValueError, notifier.notify, nt.Notifier.ANY, {})
         self.assertFalse(notifier.can_trigger_notification(nt.Notifier.ANY))
 
         self.assertEqual(0, len(call_collector))
