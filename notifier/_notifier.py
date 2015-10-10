@@ -276,6 +276,7 @@ class Notifier(object):
                     "Failure calling listener %s to notify about event"
                     " %s, details: %s", listener, event_type, details,
                     exc_info=True)
+        return len(listeners)
 
     def notify(self, event_type, details):
         """Notify about an event occurrence.
@@ -291,19 +292,24 @@ class Notifier(object):
         :param details: additional event details *dictionary* passed to
                         callback keyword argument with the same name
         :type details: dictionary
+
+        :returns: a future object that will have a result of how many
+                  listeners were called (if any); that result may be delayed
+                  depending on internal executor used.
         """
         if not self.can_trigger_notification(event_type):
             self._logger.debug("Event type '%s' is not allowed to trigger"
                                " notifications", event_type)
-            return
+            fut = futurist.Future()
+            fut.set_result(0)
+            return fut
         listeners = list(self._topics.get(self.ANY, []))
         listeners.extend(self._topics.get(event_type, []))
-        if not listeners:
-            return
         if not details:
             details = {}
-        self._executor.submit(self._do_dispatch, listeners,
-                              event_type, details)
+        fut = self._executor.submit(self._do_dispatch, listeners,
+                                    event_type, details)
+        return fut
 
     def register(self, event_type, callback,
                  args=None, kwargs=None, details_filter=None,
