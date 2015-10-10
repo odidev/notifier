@@ -284,9 +284,8 @@ class Notifier(object):
         All callbacks registered to receive notifications about given
         event type will be called. If the provided event type can not be
         used to emit notifications (this is checked via
-        the :meth:`.can_be_registered` method) then it will silently be
-        dropped (notification failures are not allowed to cause or
-        raise exceptions).
+        the :meth:`.can_be_registered` method) then a value error will be
+        raised.
 
         :param event_type: event type that occurred
         :param details: additional event details *dictionary* passed to
