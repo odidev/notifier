@@ -31,11 +31,13 @@ class NotifierTest(test.TestCase):
 
         notifier = nt.Notifier()
         notifier.register(nt.Notifier.ANY, call_me)
-        notifier.notify("config_changed", {})
-        notifier.notify("config_changed", {})
+        futs = []
+        futs.append(notifier.notify("config_changed", {}))
+        futs.append(notifier.notify("config_changed", {}))
 
         self.assertEqual(2, len(call_collector))
         self.assertEqual(1, len(notifier))
+        self.assertEqual(2, sum(f.result() for f in futs))
 
     def test_notify_not_called(self):
         call_collector = []
