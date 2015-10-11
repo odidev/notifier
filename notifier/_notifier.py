@@ -14,6 +14,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import collections
 import contextlib
 import copy
 import inspect
@@ -36,6 +37,8 @@ import six
 from notifier import _constants
 
 LOG = logging.getLogger(__name__)
+
+_Notified = collections.namedtuple("_Notified", 'total,successes,failures')
 
 
 def _make_ref(callback, weak=False):
@@ -268,6 +271,8 @@ class Notifier(object):
         self._topics.clear()
 
     def _do_dispatch(self, listeners, event_type, details):
+        possible_calls = len(listeners)
+        call_failures = 0
         for listener in listeners:
             try:
                 listener(event_type, details.copy())
@@ -276,7 +281,10 @@ class Notifier(object):
                     "Failure calling listener %s to notify about event"
                     " %s, details: %s", listener, event_type, details,
                     exc_info=True)
-        return len(listeners)
+                call_failures += 1
+        return _Notified(possible_calls,
+                         possible_calls - call_failures,
+                         call_failures)
 
     def notify(self, event_type, details):
         """Notify about an event occurrence.
@@ -292,9 +300,11 @@ class Notifier(object):
                         callback keyword argument with the same name
         :type details: dictionary
 
-        :returns: a future object that will have a result of how many
-                  listeners were called (if any); that result may be delayed
-                  depending on internal executor used.
+        :returns: a future object that will have a result named tuple with
+                  contents being (total listeners called, how many listeners
+                  were **successfully** called, how many listeners
+                  were not **successfully** called); do note that the result
+                  may be delayed depending on internal executor used.
         """
         if not self.can_trigger_notification(event_type):
             raise ValueError("Event type '%s' is not allowed to trigger"

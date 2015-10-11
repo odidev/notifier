@@ -37,7 +37,7 @@ class NotifierTest(test.TestCase):
 
         self.assertEqual(2, len(call_collector))
         self.assertEqual(1, len(notifier))
-        self.assertEqual(2, sum(f.result() for f in futs))
+        self.assertEqual(2, sum(f.result().successes for f in futs))
 
     def test_notify_not_called(self):
         call_collector = []
