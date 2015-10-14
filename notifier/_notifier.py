@@ -222,7 +222,7 @@ class Notifier(object):
     ANY = _constants.ANY
 
     #: Events which can *not* be used to trigger notifications
-    _DISALLOWED_NOTIFICATION_EVENTS = set([ANY])
+    DISALLOWED_NOTIFICATION_EVENTS = frozenset([ANY])
 
     def __init__(self, logger=None):
         self._topics = {}
@@ -465,7 +465,7 @@ class Notifier(object):
         :returns: whether the event can trigger a notification
         :rtype: boolean
         """
-        if event_type in self._DISALLOWED_NOTIFICATION_EVENTS:
+        if event_type in self.DISALLOWED_NOTIFICATION_EVENTS:
             return False
         else:
             return True
