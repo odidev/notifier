@@ -271,6 +271,7 @@ class Notifier(object):
         self._topics.clear()
 
     def _do_dispatch(self, listeners, event_type, details):
+        """Calls into listeners, handling failures and logging as needed."""
         possible_calls = len(listeners)
         call_failures = 0
         for listener in listeners:
