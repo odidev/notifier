@@ -2,6 +2,9 @@
 Notifier
 ========
 
+.. image:: https://travis-ci.org/harlowja/notifier.png?branch=master
+   :target: https://travis-ci.org/harlowja/notifier
+
 In memory pub/sub [1]_
 
 * Free software: Apache license
