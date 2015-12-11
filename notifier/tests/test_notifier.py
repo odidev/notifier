@@ -16,12 +16,28 @@
 
 import collections
 import functools
+import pickle
 
 import notifier as nt
 from notifier import test
 
 
+# Module level so pickling can find it..
+def noop_call_me(state, details):
+    pass
+
+
 class NotifierTest(test.TestCase):
+
+    def test_pickle_works(self):
+        notifier = nt.Notifier()
+        notifier.register(nt.Notifier.ANY, noop_call_me)
+        blob = pickle.dumps(notifier)
+        notifier2 = pickle.loads(blob)
+        self.assertEqual(1, len(notifier2))
+        listeners = dict(notifier2.listeners_iter())
+        self.assertEqual(noop_call_me,
+                         listeners[nt.Notifier.ANY][0].callback)
 
     def test_notify_called(self):
         call_collector = []
