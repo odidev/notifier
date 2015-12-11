@@ -447,7 +447,7 @@ class Notifier(object):
         while topics:
             event_type = topics.pop()
             try:
-                yield self._topics[event_type]
+                yield event_type, self._topics[event_type]
             except KeyError:
                 pass
 

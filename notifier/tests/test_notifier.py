@@ -39,6 +39,20 @@ class NotifierTest(test.TestCase):
         self.assertEqual(1, len(notifier))
         self.assertEqual(2, sum(f.result().successes for f in futs))
 
+    def test_listeners_iter(self):
+
+        def call_me(event_type, details):
+            pass
+
+        notifier = nt.Notifier()
+        notifier.register(nt.Notifier.ANY, call_me)
+        notifier.register("blah", call_me)
+        listeners = dict(notifier.listeners_iter())
+        self.assertIn(notifier.ANY, listeners)
+        self.assertEqual(1, len(listeners[notifier.ANY]))
+        self.assertIn('blah', listeners)
+        self.assertEqual(1, len(listeners['blah']))
+
     def test_notify_not_called(self):
         call_collector = []
 
