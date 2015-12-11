@@ -224,12 +224,27 @@ class Notifier(object):
     #: Events which can *not* be used to trigger notifications
     DISALLOWED_NOTIFICATION_EVENTS = frozenset([ANY])
 
-    def __init__(self, logger=None):
+    LOG = None
+    """
+    Logger that can be used to log failures (if none the module logger is
+    used instead).
+    """
+
+    def __init__(self):
         self._topics = {}
         self._lock = threading.Lock()
-        if logger is None:
-            logger = LOG
-        self._logger = logger
+        self._logger = self.LOG or LOG
+        self._executor = futurist.SynchronousExecutor()
+
+    def __getstate__(self):
+        return {
+            'topics': self._topics,
+        }
+
+    def __setstate__(self, dct):
+        self._topics = dct['topics']
+        self._lock = threading.Lock()
+        self._logger = self.LOG or LOG
         self._executor = futurist.SynchronousExecutor()
 
     def __len__(self):
@@ -480,10 +495,21 @@ class RestrictedNotifier(Notifier):
     when constructing the notifier.
     """
 
-    def __init__(self, watchable_events, allow_any=True, logger=None):
-        super(RestrictedNotifier, self).__init__(logger=logger)
+    def __init__(self, watchable_events, allow_any=True):
+        super(RestrictedNotifier, self).__init__()
         self._watchable_events = frozenset(watchable_events)
         self._allow_any = allow_any
+
+    def __getstate__(self):
+        dct = super(RestrictedNotifier, self).__getstate__()
+        dct['watchables'] = self._watchable_events
+        dct['allow_any'] = self._allow_any
+        return dct
+
+    def __setstate__(self, dct):
+        super(RestrictedNotifier, self).__setstate__(dct)
+        self._watchable_events = dct['watchables']
+        self._allow_any = dct['allow_any']
 
     def events_iter(self):
         """Returns iterator of events that can be registered/subscribed to.
